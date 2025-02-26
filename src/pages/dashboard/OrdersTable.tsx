@@ -47,10 +47,20 @@ interface IOrderTableProps {
   data: ITeacher[];
   handleDelete: (id: number) => void;
   isLoadingDelete: boolean;
-  openEditModal: (teacher: ITeacher) => void;
+  openEditModal: (e: React.MouseEvent<HTMLButtonElement>, teacher: ITeacher) => void;
+  checkTeacher: (id: number) => void;
+  openTeacherImageRegisterModal: (teacher: ITeacher) => void;
 }
 
-export default function OrderTable({ headCells, data, handleDelete, isLoadingDelete, openEditModal }: IOrderTableProps) {
+export default function OrderTable({
+  headCells,
+  data,
+  handleDelete,
+  isLoadingDelete,
+  openEditModal,
+  checkTeacher,
+  openTeacherImageRegisterModal
+}: IOrderTableProps) {
   const order = 'asc';
   const orderBy = 'tracking_no';
 
@@ -81,7 +91,14 @@ export default function OrderTable({ headCells, data, handleDelete, isLoadingDel
               const labelId = `enhanced-table-checkbox-${index}`;
 
               return (
-                <TableRow hover role="checkbox" sx={{ '&:last-child td, &:last-child th': { border: 0 } }} tabIndex={-1} key={row.id}>
+                <TableRow
+                  onClick={() => checkTeacher(row.id)}
+                  hover
+                  role="checkbox"
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  tabIndex={-1}
+                  key={row.id}
+                >
                   <TableCell component="th" id={labelId} scope="row">
                     {index + 1}
                   </TableCell>
@@ -94,21 +111,40 @@ export default function OrderTable({ headCells, data, handleDelete, isLoadingDel
                   <TableCell>{truncate(row.pinfl === null ? '-' : row.pinfl, 10)}</TableCell>
                   <TableCell>{truncate(row.position === null ? '-' : row.position, 10)}</TableCell>
                   <TableCell sx={{ display: 'flex' }}>
-                    <IconButton color="primary" onClick={() => openEditModal(row)}>
+                    <IconButton color="primary" onClick={(e: React.MouseEvent<HTMLButtonElement>) => openEditModal(e, row)}>
                       <EditIcon />
                     </IconButton>
 
-                    <IconButton color="error" onClick={() => handleDelete(row.id)} disabled={isLoadingDelete}>
+                    <IconButton
+                      color="error"
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        handleDelete(row.id);
+                      }}
+                      disabled={isLoadingDelete}
+                    >
                       {isLoadingDelete ? <CircularProgress size={20} /> : <DeleteIcon />}
                     </IconButton>
 
-                    <IconButton color="secondary">
+                    <IconButton
+                      color="secondary"
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        openTeacherImageRegisterModal(row);
+                      }}
+                    >
                       <CameraAltIcon />
                     </IconButton>
 
                     <Tooltip title={copiedId === row.id ? 'Copied!' : 'Copy'}>
                       <motion.div animate={{ scale: copiedId === row.id ? 1.2 : 1 }} transition={{ type: 'spring', stiffness: 300 }}>
-                        <IconButton color={copiedId === row.id ? 'success' : 'default'} onClick={() => handleCopy(row)}>
+                        <IconButton
+                          color={copiedId === row.id ? 'success' : 'default'}
+                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                            e.stopPropagation();
+                            handleCopy(row);
+                          }}
+                        >
                           <ContentCopyIcon />
                         </IconButton>
                       </motion.div>

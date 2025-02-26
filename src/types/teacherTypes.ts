@@ -18,3 +18,16 @@ export interface IPaging {
   totalPages?: number;
   totalItems?: number;
 }
+
+export interface ITeacherImageResponse {
+  timestamp: number;
+  success: boolean;
+  errorMessage: string;
+  data: ITeacherImage[];
+}
+
+export interface ITeacherImage {
+  id: number;
+  imgId: number;
+  faceImgId: number;
+}

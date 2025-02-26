@@ -4,7 +4,7 @@ import Typography from '@mui/material/Typography';
 import MainCard from '../../components/MainCard';
 import OrdersTable from './OrdersTable';
 
-import { deleteItemServ, postItemsServ, putItemServ } from '../../services';
+import { deleteItemServ, postItemsServ, postRegisterTeacherImage, putItemServ } from '../../services';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ITeacher, ITeachersResponse, ITeachersTableHead } from '../../types';
 import Loader from '../../components/Loader';
@@ -12,7 +12,9 @@ import { teachersHeadCells } from '../../consts';
 import { Alert, Box, Button, CircularProgress, Modal, Snackbar, TablePagination, TextField } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import Webcam from 'react-webcam';
 
 export default function DashboardDefault() {
   const [open, setOpen] = useState(false);
@@ -20,6 +22,15 @@ export default function DashboardDefault() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [page, setPage] = useState(0);
   const [editingTeacher, setEditingTeacher] = useState<ITeacher | null>(null);
+
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const webcamRef = useRef<Webcam>(null);
+
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrlBack, setImageUrlBack] = useState<File | null>(null);
+  const [teacherId, setTeacherId] = useState('');
+
+  const navigate = useNavigate();
 
   const {
     data: teachersData,
@@ -70,6 +81,27 @@ export default function DashboardDefault() {
     }
   });
 
+  const { mutate: checkTeacherFn, isPending: isLoadingCheckTeacher } = useMutation({
+    mutationFn: (formData: FormData) => postRegisterTeacherImage(formData, teacherId),
+    onSuccess: (data) => {
+      if (data.success) {
+        setSnackbarMessage(data.data.message || 'Image is Successfully registered');
+        setSnackbarOpen(true);
+        setIsCameraOpen(false);
+        setImageUrlBack(null);
+        setImageUrl('');
+      }
+      if (!data.success) {
+        setSnackbarMessage(data.errorMessage || 'Something went wrong');
+        setSnackbarOpen(true);
+      }
+    },
+    onError: (error) => {
+      setSnackbarMessage(error.message || 'Failed to recognize teacher.');
+      setSnackbarOpen(true);
+    }
+  });
+
   const formik = useFormik({
     initialValues: {
       firstName: '',
@@ -98,7 +130,8 @@ export default function DashboardDefault() {
 
   const handleDelete = (id: number) => window.confirm('Are you sure you want to delete this teacher?') && deleteTeacherFn(id);
 
-  const handleEdit = (teacher: ITeacher) => {
+  const handleEdit = (e: React.MouseEvent<HTMLButtonElement>, teacher: ITeacher) => {
+    e.stopPropagation();
     setEditingTeacher(teacher);
     formik.setValues(teacher);
     setOpen(true);
@@ -108,6 +141,33 @@ export default function DashboardDefault() {
     setEditingTeacher(null);
     formik.resetForm();
     setOpen(false);
+  };
+
+  const capturePhoto = useCallback(() => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      setImageUrl(imageSrc);
+      fetch(imageSrc)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const file = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+          setImageUrlBack(file);
+        });
+    }
+  }, []);
+
+  const checkTeacherDetails = () => {
+    const formData = new FormData();
+    if (teacherId && imageUrlBack) {
+      formData.append('teacherId', teacherId);
+      formData.append('file', imageUrlBack);
+    }
+    checkTeacherFn(formData);
+  };
+
+  const openTeacherImageRegisterModal = (teacher: ITeacher) => {
+    setTeacherId(String(teacher.id));
+    setIsCameraOpen(true);
   };
 
   return (
@@ -135,6 +195,8 @@ export default function DashboardDefault() {
               handleDelete={handleDelete}
               isLoadingDelete={isLoadingDeleteItem}
               openEditModal={handleEdit}
+              checkTeacher={(id: number) => navigate(`check-teacher/${id}`)}
+              openTeacherImageRegisterModal={openTeacherImageRegisterModal}
             />
             <TablePagination
               component="div"
@@ -143,8 +205,6 @@ export default function DashboardDefault() {
               page={page}
               onPageChange={(_, newPage: number) => setPage(newPage)}
               rowsPerPageOptions={[]}
-              // showFirstButton
-              // showLastButton
             />
           </MainCard>
         </Grid>
@@ -190,6 +250,56 @@ export default function DashboardDefault() {
               )}
             </Button>
           </form>
+        </Box>
+      </Modal>
+
+      <Modal open={isCameraOpen} onClose={() => setIsCameraOpen(false)}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            p: 4,
+            borderRadius: 2
+          }}
+        >
+          <Box sx={{ maxWidth: 400, mx: 'auto', mt: 5, textAlign: 'center' }}>
+            <Typography variant="h5" mb={2}>
+              Enter Teacher ID
+            </Typography>
+            <TextField
+              fullWidth
+              type="number"
+              label="Teacher ID"
+              variant="outlined"
+              value={teacherId}
+              onChange={(e) => setTeacherId(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+
+            {isCameraOpen && (
+              <Box sx={{ mb: 2 }}>
+                <Webcam ref={webcamRef} screenshotFormat="image/jpeg" width="100%" height={200} />
+                <Button variant="contained" fullWidth sx={{ mt: 1 }} onClick={capturePhoto}>
+                  Capture Photo
+                </Button>
+              </Box>
+            )}
+            {imageUrl && (
+              <Box
+                component="img"
+                src={imageUrl}
+                alt="Teacher Preview"
+                sx={{ width: '100%', height: 200, objectFit: 'cover', mb: 2, borderRadius: 2 }}
+              />
+            )}
+            <Button fullWidth variant="contained" disabled={!teacherId || isLoadingCheckTeacher} onClick={checkTeacherDetails}>
+              {isLoadingCheckTeacher ? <CircularProgress size={20} /> : 'Submit ID'}
+            </Button>
+          </Box>
         </Box>
       </Modal>
 
